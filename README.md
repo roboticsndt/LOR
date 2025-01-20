@@ -50,4 +50,5 @@ To evaluate the results, you can use PRcurve1.py to calculate the PR curve, use 
 For this, you will need to prepare an additional file containing the ground truth poses for each frame. see src/eval.cpp for details.
 
 
-### LOR is based on LOAM(J. Zhang and S. Singh.) and lio-sam(Tixiao Shan).
+### Acknowledgement 
+LOR is based on LOAM(J. Zhang and S. Singh.) and lio-sam(Tixiao Shan).
