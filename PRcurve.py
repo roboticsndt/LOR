@@ -1,0 +1,202 @@
+import matplotlib.pyplot as ply
+import glob
+import os
+import sys
+import math
+
+def load_gt(gt_filename):
+	# frame_index loop_id1 loop_id2 ....
+	gt = []
+	with open(gt_filename, 'r') as f:
+		for line in f:
+			line = line.strip()
+			if line == '':
+				continue
+			if line.find(' ') != -1:
+				objs = line.split(' ')
+				gt.append((int(objs[0]), [int(i) for i in objs[1:] if int(i) < int(objs[0]) - 50]))
+	return { k:v for k, v in gt if len(v) > 0 }
+
+
+def load_result_file(result_filename):
+    # self_index history_index distance
+    result = []
+    with open(result_filename, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if line == '':
+                continue
+            if line.count(',') == 3:
+                (a, b, d, loss) = line.split(',')
+            else:
+                (a, b, d, loss) = line.split(' ')
+            if float(d) < 1e-5:
+                d = 1000.0
+
+            result.append((int(a), int(b), float(d), float(loss) < 1.0))
+    return result
+
+def mark_result_for_iteration(result):
+    value_category = [] # 0: false positive, 1: true positive, 2: false negative, 3: true negative
+    category_counter = [0, 0, 0, 0]
+
+    # using a maximin distance threshold
+    for p in result:
+        if p[1] >= 0: # positive
+            if p[3]: # true positive
+                value_category.append((p[2], 1)) # true positive
+                category_counter[1] += 1
+            else: # false positive
+                value_category.append((p[2], 0)) # false positive
+                category_counter[0] += 1
+        else: # negative
+            if p[3]: # false negative
+                category_counter[2] += 1
+            else: # true negative
+                category_counter[3] += 1
+    
+    return value_category, category_counter
+
+
+def calculate_prvalue(value_category, category_counter):
+    TP = category_counter[1]
+    FP = category_counter[0]
+    FN = category_counter[2]
+    TN = category_counter[3]
+
+    sorted_category = sorted(value_category, key=lambda x: x[0], reverse=True)
+
+    pr_values = []
+
+    for (score, category) in sorted_category:
+        if category == 0: # false positive to true negative
+            FP -= 1
+            TN += 1
+        elif category == 1: # true positive to false negative
+            TP -= 1
+            FN += 1
+        
+        if TP + FP == 0 or TP + FN == 0 or TP == 0:
+            continue
+        precision = TP / (TP + FP)
+        recall = TP / (TP + FN)
+
+        pr_values.append((precision, recall))
+    
+    pr_values = sorted(pr_values, key=lambda x: x[1], reverse=True)
+    return pr_values
+
+
+def calculate_PR(result):
+    value_category, category_counter = mark_result_for_iteration(result)
+    pr_values = calculate_prvalue(value_category, category_counter)
+    return pr_values
+
+def downsample_pr_values(pr_values):
+    ds_pr = [pr_values[0]]
+    (P, R) = pr_values[0]
+    for (p, r) in pr_values:
+        if math.isclose(r, R, abs_tol=0.1) and math.isclose(p, P, abs_tol=0.1):
+            continue
+        ds_pr.append((p, r))
+        (P, R) = (p, r)
+    return ds_pr
+
+def plot_PR_curve(names, pr_values, save_path=None):
+    assert len(names) == len(pr_values)
+
+    colors = ['gold','dodgerblue','yellowgreen','purple','tomato','darkorange','purple','red','chocolate']
+    markers = ['s','^','d','p','*','o','x','1','*','h']
+
+    plots = []
+    used_names = []
+    for i in range(len(pr_values)):
+        if len(pr_values[i]) == 0:
+            continue
+        used_names.append(names[i])
+        x = [v[1] for v in pr_values[i]]
+        y = [v[0] for v in pr_values[i]]
+        p, = ply.plot(x, y, color=colors[i], linewidth=1)
+
+        ds_value = downsample_pr_values(pr_values[i])
+        x = [v[1] for v in ds_value]
+        y = [v[0] for v in ds_value]
+        ply.scatter(x, y, color=colors[i], marker=markers[i])
+        plots.append(p)
+        
+    ply.xlabel("recall", fontsize = 20)
+    ply.ylabel("precision", fontsize =20)
+	#set xrange and yrange
+    ply.xlim(0, 1.02)
+    ply.ylim(0, 1.02)
+    ply.xticks(fontsize=19)
+    ply.yticks(fontsize=19)
+    ply.legend(plots, used_names, loc="lower left", numpoints=1, fontsize =16)
+
+    ply.tight_layout()
+    if save_path is not None:
+        ply.savefig(save_path, dpi=330)
+    
+    ply.show()
+
+def grab_dir(dir_path):
+    file_names = []
+    for file in os.listdir(dir_path):
+        if not os.path.isdir(os.path.join(dir_path, file)):
+            if file != "gt.txt":
+                file_names.append(os.path.join(dir_path,file))
+    return file_names
+
+def grab_file_lists(argv):
+    if len(argv) == 2 and os.path.isdir(argv[1]):
+        return grab_dir(argv[1])
+
+    input_files = []
+    for i in range(1, len(argv)):
+        this_files = glob.glob(argv[i])
+        for f in this_files:
+            if f not in input_files:
+                input_files.append(f)
+    return input_files
+
+def get_short_name(file_path):
+	(filepath,tempfilename) = os.path.split(file_path)
+	(filename,extension) = os.path.splitext(tempfilename)
+	return filename
+
+def get_f1score(precision, recall):
+    if precision + recall == 0:
+        return 0.0
+    return 2 * precision * recall / (precision + recall)
+
+def get_f1score_from_pr_values(pr_values):
+    if len(pr_values) == 0:
+        return "N/A"
+    f1_scores = [get_f1score(p, r) for (p, r) in pr_values]
+    return max(f1_scores)
+
+def run(input_files, save_path=None):
+    names = [get_short_name(f) for f in input_files]
+
+    pr_values = [calculate_PR(load_result_file(f)) for f in input_files]
+    f1 = [get_f1score_from_pr_values(pr) for pr in pr_values]
+
+    for i in range(len(input_files)):
+        print(f"{names[i]}: {f1[i]}")
+    
+    plot_PR_curve(names, pr_values, save_path)
+
+
+def main():
+    if len(sys.argv) > 1:
+        return run(grab_file_lists(sys.argv))
+    
+    input_dir = ""
+    save_path = ""
+
+    run(grab_dir(input_dir), save_path)
+
+
+if __name__ == "__main__":
+    main()
+            

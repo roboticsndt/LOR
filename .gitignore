@@ -1,0 +1,12 @@
+.vscode
+build
+build-release
+eval/*
+output/*
+sophus/*
+verify/*
+!verify/ScanContext.hpp
+!verify/ScanContext.cpp
+!verify/loam.hpp
+eval.py
+launch.py
