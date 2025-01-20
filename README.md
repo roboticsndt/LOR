@@ -10,6 +10,10 @@ The code has been tested in the following environment.
 | -- | -- | -- | 
 | 24.04 | 1.14.0 | 1.5.4 |
 
+## Self-collected dataset
+
+The Campus "08", "43", "51", "59" sequences can be available at https://www.kaggle.com/datasets/anacondaspyder/self-collected-dataset.
+
 ## Prepare the data
 
 Save the data in a folder, naming each file according to the frame number, starting from 0.
@@ -19,7 +23,7 @@ If the files are in PCD format, the points in each file should include the field
 If the files are in the same bin format as KITTI, the point clouds should also be ordered in the same way as KITTI.This is to calculate the ring information of the point cloud.
 
 
-## compile
+## Compile
 
 1. Install dependences
 ``` shell
