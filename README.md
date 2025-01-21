@@ -4,6 +4,7 @@
 A LiDAR odometry-based registration method is proposed for loop closure detection.
 
 ![ours](doc/2025-01-17T12_35_08.898Z-139132.gif)
+The GIF illustrates the iterative process. The source point cloud is shown in alternating white and blue, while the target point cloud is depicted in green and red. The different colors within each point cloud represent edge features and planar features.
 
 The code has been tested in the following environment.
 |ubuntu| pcl | nanoflann |
