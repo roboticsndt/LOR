@@ -1,5 +1,3 @@
-# LOR : LiDAR Odometry-based Registration
-### This is the repo for IJCAI submission #2005.
 
 A LiDAR odometry-based registration method is proposed for loop closure detection.
 
